@@ -1,3 +1,4 @@
+[source: 3]
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -386,7 +387,7 @@
 </div>
 
 <script>
-const WEB_APP_URL_FIXED = "https://script.google.com/macros/s/AKfycbzgyo6niHCX5RFeLDMQymjmPnimF8ey7CgqIVbwUJjGqNAgJTcPT2vIgRyWnvSDhurChQ/exec";
+const WEB_APP_URL_FIXED = "https://script.google.com/macros/s/AKfycbzi_fRUuNrwEueBgmw0tyWWL87qgFLPuMaPaQ8Fh3a3mwwMcOaNh5V1wZZPzLEBDUbo/exec";
 
 let AUTH_TOKEN = localStorage.getItem('pf_token') || '';
 let WEB_APP_URL = WEB_APP_URL_FIXED || localStorage.getItem('pf_webapp_url') || "";
@@ -1192,6 +1193,8 @@ function saveDebt(ev){
   const dueDate = document.getElementById('debtDueDate').value || '';
   const note = document.getElementById('debtNote').value.trim();
 
+  if(!person || amount <= 0) return;
+
   let d = debts.find(x=>x.id===id);
   if(!d){
     d = { id: 'd_' + Date.now() + '_' + Math.floor(Math.random()*1000), createdAt: Date.now() };
@@ -1205,74 +1208,86 @@ function saveDebt(ev){
 function deleteDebt(){
   const id = document.getElementById('debtId').value;
   if(!id) return;
-  if(!confirm('هل تريد حذف هذا الدين؟')) return;
+  if(!confirm('هل تريد حذف هذا الدين نهائياً؟')) return;
   debts = debts.filter(x=>x.id!==id);
   saveDebts(); renderDebts(); closeDebtSheet();
   queueDebtOp({t:'d', id:id});
 }
 
 function renderDebts(){
-  const rate = parseFloat(document.getElementById('exchangeRateInput').value)||15000;
-  let sumForMe = 0, sumOnMe = 0;
-  debts.forEach(d=>{
-    const rem = Math.max(0, (Number(d.amount)||0) - (Number(d.paid)||0));
-    if(d.type==='for_me') sumForMe += rem;
-    else sumOnMe += rem;
+  const rate = parseFloat(document.getElementById('exchangeRateInput').value) || 15000;
+  let forMeTotal = 0, onMeTotal = 0;
+
+  debts.forEach(d => {
+    const rem = (d.amount || 0) - (d.paid || 0);
+    if(rem > 0){
+      if(d.type === 'for_me') forMeTotal += rem;
+      else onMeTotal += rem;
+    }
   });
 
-  document.getElementById('totalDebtsForMe').innerText = fmt(sumForMe) + ' ل.س';
-  document.getElementById('totalDebtsForMeUSD').innerText = '$' + usdVal(sumForMe/rate);
-  document.getElementById('totalDebtsOnMe').innerText = fmt(sumOnMe) + ' ل.س';
-  document.getElementById('totalDebtsOnMeUSD').innerText = '$' + usdVal(sumOnMe/rate);
+  document.getElementById('totalDebtsForMe').innerText = fmt(forMeTotal) + ' ل.س';
+  document.getElementById('totalDebtsForMeUSD').innerText = '$' + usdVal(forMeTotal / rate);
+  document.getElementById('totalDebtsOnMe').innerText = fmt(onMeTotal) + ' ل.س';
+  document.getElementById('totalDebtsOnMeUSD').innerText = '$' + usdVal(onMeTotal / rate);
 
-  const shown = debts.filter(d=>{
-    const rem = (Number(d.amount)||0) - (Number(d.paid)||0);
-    if(debtFilter==='settled') return rem <= 0;
-    if(debtFilter==='for_me') return d.type==='for_me' && rem > 0;
-    if(debtFilter==='on_me') return d.type==='on_me' && rem > 0;
+  const list = document.getElementById('debtsList');
+  let filtered = debts.filter(d => {
+    const rem = (d.amount || 0) - (d.paid || 0);
+    if(debtFilter === 'settled') return rem <= 0;
+    if(rem <= 0) return false;
+    if(debtFilter === 'for_me') return d.type === 'for_me';
+    if(debtFilter === 'on_me') return d.type === 'on_me';
     return true;
   });
 
-  const list = document.getElementById('debtsList');
-  if(!shown.length){
+  if(!filtered.length){
     list.innerHTML = `<p class="text-[12px] text-center py-8" style="color:var(--muted)">لا توجد ديون مسجلة</p>`;
     return;
   }
 
-  list.innerHTML = shown.map(d=>{
-    const isForMe = d.type === 'for_me';
-    const total = Number(d.amount)||0;
-    const paid = Number(d.paid)||0;
-    const rem = Math.max(0, total - paid);
+  list.innerHTML = filtered.map(d => {
+    const rem = Math.max(0, (d.amount || 0) - (d.paid || 0));
+    const isFor = d.type === 'for_me';
     const isSettled = rem <= 0;
-    const color = isSettled ? 'var(--muted)' : (isForMe ? 'var(--leaf)' : 'var(--soil)');
+    const color = isSettled ? 'var(--muted)' : (isFor ? 'var(--leaf)' : 'var(--soil)');
+    const pct = d.amount ? Math.min(100, Math.round((d.paid || 0) / d.amount * 100)) : 0;
 
-    return `<div onclick="openEditDebt('${d.id}')" class="rounded-2xl p-3.5 flex items-center justify-between cursor-pointer active:opacity-70" style="background:var(--surface);border:1px solid var(--line);${isSettled?'opacity:.6':''}">
-      <div class="flex items-center gap-3">
-        <div class="w-2 h-10 rounded-full" style="background:${color}"></div>
+    return `<div onclick="openEditDebt('${d.id}')" class="rounded-2xl p-4 cursor-pointer active:opacity-70 space-y-2" style="background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid ${color}">
+      <div class="flex items-center justify-between">
         <div>
-          <div class="flex items-center gap-1.5">
-            <p class="font-bold text-[13px]">${esc(d.person)}</p>
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded" style="background:var(--chip);color:${color}">${isSettled ? 'مسدد بالكامل' : (isForMe ? 'دين لي' : 'دين علي')}</span>
-          </div>
-          <p class="text-[11px]" style="color:var(--muted)">${d.date||''}${d.dueDate ? ' · يستحق: '+d.dueDate : ''}${d.note ? ' · '+esc(d.note) : ''}</p>
+          <span class="text-[10px] font-bold rounded-md px-1.5 py-0.5" style="background:var(--chip);color:${color}">
+            ${isSettled ? 'مسدد بالكامل' : (isFor ? 'دين لي (أطالب به)' : 'دين علي (التزام)')}
+          </span>
+          <h4 class="font-bold text-[14px] mt-1">${esc(d.person)}</h4>
+        </div>
+        <div class="text-left">
+          <p class="font-bold text-[14px]" style="color:${color}">${fmt(rem)} ل.س</p>
+          <p class="text-[10px]" style="color:var(--muted)">من أصل ${fmt(d.amount)}</p>
         </div>
       </div>
-      <div class="text-left">
-        <p class="font-bold text-[13px]" style="color:${color}">${fmt(rem)} ل.س</p>
-        <p class="text-[10px]" style="color:var(--muted)">المتبقي من ${fmt(total)}</p>
+      
+      <div class="space-y-1">
+        <div class="flex justify-between text-[10px]" style="color:var(--muted)">
+          <span>المسدد: ${fmt(d.paid||0)} ل.س (${pct}%)</span>
+          <span>التاريخ: ${d.date||''}</span>
+        </div>
+        <div class="h-1.5 rounded-full overflow-hidden" style="background:var(--chip)">
+          <div class="h-full rounded-full" style="width:${pct}%;background:${color}"></div>
+        </div>
       </div>
+
+      ${d.dueDate || d.note ? `
+        <div class="flex flex-wrap items-center justify-between text-[11px] pt-1" style="color:var(--muted);border-top:1px dashed var(--line)">
+          ${d.note ? `<span class="break-words">${esc(d.note)}</span>` : '<span></span>'}
+          ${d.dueDate ? `<span class="text-[10px] font-semibold" style="color:var(--amber)">استحقاق: ${d.dueDate}</span>` : ''}
+        </div>
+      ` : ''}
     </div>`;
   }).join('');
 }
 
-// ---- تهيئة التطبيق عند الفتح ----
 window.addEventListener('DOMContentLoaded', function(){
-  fillWalletSelects();
-  const savedRate = localStorage.getItem('pf_rate');
-  if(savedRate) document.getElementById('exchangeRateInput').value = savedRate;
-  if(WEB_APP_URL) document.getElementById('webAppUrlInput').value = WEB_APP_URL;
-  renderAll();
   initLock();
 });
 </script>
