@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>يومياتي</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Markazi+Text:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#EFF1EC; --surface:#FFFFFF; --ink:#22251F; --muted:#767C71; --line:#DDE2D8;
+    --brand:#20423D; --brand2:#2E5F57; --leaf:#3E8E73; --leaf-bg:#DEEEE6;
+    --soil:#C0563F; --soil-bg:#F7E1DA; --chip:#E7EBE2; --amber:#B7860B; --blue:#4E7A8C;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12140F; --surface:#1B1F18; --ink:#E9EBE3; --muted:#98A091; --line:#2E332A;
+      --brand:#3E7A70; --brand2:#4B948A; --leaf:#6BC1A2; --leaf-bg:#20302A;
+      --soil:#E0785D; --soil-bg:#33241E; --chip:#252A20; --amber:#E3B341; --blue:#7FB0C4;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12140F; --surface:#1B1F18; --ink:#E9EBE3; --muted:#98A091; --line:#2E332A;
+    --brand:#3E7A70; --brand2:#4B948A; --leaf:#6BC1A2; --leaf-bg:#20302A;
+    --soil:#E0785D; --soil-bg:#33241E; --chip:#252A20; --amber:#E3B341; --blue:#7FB0C4;
+  }
+  html,body{background:var(--bg);color:var(--ink);}
+  *{box-sizing:border-box;}
+  body{font-family:'Cairo',sans-serif; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);}
+  .disp{font-family:'Markazi Text',serif;}
+  ::-webkit-scrollbar{height:6px;width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px;}
+  .sheet{transition:transform .28s cubic-bezier(.32,.72,0,1);}
+  .tabpane{display:none;} .tabpane.active{display:block;}
+  .navbtn.active{color:var(--brand2);}
+  input,select{color:var(--ink);}
+  input::placeholder{color:var(--muted);}
+  .shake{animation:shake .3s;}
+  @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+</style>
+</head>
+<body class="min-h-screen flex flex-col" style="background:var(--bg)">
+
+<div id="lockScreen" class="fixed inset-0 z-[60] flex items-center justify-center p-6" style="background:var(--bg)">
+  <div class="w-full max-w-xs">
+    <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style="background:var(--brand)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DDEFC9" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    </div>
+    <div id="lockEnterView" class="hidden text-center space-y-3">
+      <h2 class="font-bold text-[15px]">أدخل رمز الدخول</h2>
+      <input type="password" maxlength="12" id="enterPin" placeholder="رمز الدخول" class="w-full text-center rounded-xl px-3 py-3 text-[16px] tracking-widest outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      <p id="lockError" class="hidden text-[11px]" style="color:var(--soil)">الرمز غير صحيح، حاول مرة أخرى.</p>
+      <button id="loginBtn" onclick="checkPin()" class="w-full rounded-xl py-3 text-[13px] font-bold" style="background:var(--brand);color:#fff">دخول</button>
+      <button onclick="forgotPin()" class="w-full text-[11px]" style="color:var(--muted)">نسيت الرمز؟</button>
+    </div>
+  </div>
+</div>
+
+<div id="appRoot">
+<header class="sticky top-0 z-30 px-4 pt-3 pb-3" style="background:var(--brand);padding-top:calc(env(safe-area-inset-top,0px) + 12px)">
+  <div class="max-w-lg mx-auto flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--brand2)">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#DDEFC9" stroke-width="1.8"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
+      </div>
+      <div>
+        <h1 class="text-[15px] font-bold text-white leading-tight">يومياتي</h1>
+        <p id="syncStatus" class="text-[11px] leading-tight" style="color:#BFE0C7">جارٍ الاتصال بالسحابة…</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="showTab('settings')" aria-label="الإعدادات" class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--brand2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#DDEFC9" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.9 7.9 0 0 0 0-3l2-1.4-2-3.4-2.3.8a7.9 7.9 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.5a7.9 7.9 0 0 0-2.6 1.5l-2.3-.8-2 3.4 2 1.4a7.9 7.9 0 0 0 0 3l-2 1.4 2 3.4 2.3-.8a7.9 7.9 0 0 0 2.6 1.5l.5 2.5h4l.5-2.5a7.9 7.9 0 0 0 2.6-1.5l2.3.8 2-3.4-2-1.4Z"/></svg></button>
+      <button onclick="lockNow()" class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--brand2)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DDEFC9" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      </button>
+      <button onclick="toggleTheme()" class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--brand2)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#DDEFC9" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-grow max-w-lg w-full mx-auto p-4 pb-28 space-y-4">
+  <section id="tab-dash" class="tabpane active space-y-4">
+    <div class="rounded-2xl p-3 flex flex-wrap gap-2 items-center" style="background:var(--surface);border:1px solid var(--line)">
+      <button data-period="all" onclick="setPeriod('all')" class="period-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--brand);color:#fff">الكل</button>
+      <button data-period="thisMonth" onclick="setPeriod('thisMonth')" class="period-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">هذا الشهر</button>
+      <button data-period="thisYear" onclick="setPeriod('thisYear')" class="period-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">هذه السنة</button>
+      <input type="month" id="pickMonthInput" onchange="setPeriod('pickMonth')" class="period-btn rounded-lg px-2 py-1.5 text-[11px] font-semibold outline-none" style="background:var(--chip);color:var(--ink);border:1px solid var(--line)">
+      <select id="pickYearSelect" onchange="setPeriod('pickYear')" class="period-btn rounded-lg px-2 py-1.5 text-[11px] font-semibold outline-none" style="background:var(--chip);color:var(--ink);border:1px solid var(--line)"><option value="">اختر سنة</option></select>
+    </div>
+    <div class="rounded-3xl p-5" style="background:var(--surface);border:1px solid var(--line)">
+      <p class="text-[12px] font-medium" style="color:var(--muted)">الصافي · <span id="periodLabel">كل الفترات</span></p>
+      <h2 id="netProfit" class="disp text-[42px] font-bold leading-none mt-1" style="color:var(--brand2)">0 ل.س</h2>
+      <p id="netProfitUSD" class="text-[12px] mt-1" style="color:var(--muted)">$0.00</p>
+      <div class="flex items-center gap-2 mt-4 text-[11px]" style="color:var(--muted)">
+        <span>سعر صرف الدولار:</span>
+        <input type="number" id="exchangeRateInput" onchange="saveRate();renderAll()" value="15000" class="w-24 rounded-lg px-2 py-1 text-center font-bold outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        <span>ل.س</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="rounded-2xl p-4" style="background:var(--leaf-bg);border:1px solid var(--line)">
+        <p class="text-[11px] font-semibold" style="color:var(--muted)">الدخل</p>
+        <h3 id="totalRevenue" class="text-[19px] font-bold mt-1" style="color:var(--leaf)">0 ل.س</h3>
+        <p id="totalRevenueUSD" class="text-[11px]" style="color:var(--muted)">$0.00</p>
+      </div>
+      <div class="rounded-2xl p-4" style="background:var(--soil-bg);border:1px solid var(--line)">
+        <p class="text-[11px] font-semibold" style="color:var(--muted)">المصروف</p>
+        <h3 id="totalExpenses" class="text-[19px] font-bold mt-1" style="color:var(--soil)">0 ل.س</h3>
+        <p id="totalExpensesUSD" class="text-[11px]" style="color:var(--muted)">$0.00</p>
+      </div>
+    </div>
+    <div class="rounded-2xl p-4" style="background:var(--surface);border:1px solid var(--line)">
+      <h3 class="font-bold text-[13px] mb-3">الدخل مقابل المصروف</h3>
+      <div class="relative h-52"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="rounded-2xl p-4" style="background:var(--surface);border:1px solid var(--line)">
+      <h3 class="font-bold text-[13px] mb-3">توزيع المصروف حسب البند</h3>
+      <div class="relative h-56 flex items-center justify-center"><canvas id="pieChart"></canvas></div>
+    </div>
+  </section>
+
+  <section id="tab-list" class="tabpane space-y-3">
+    <div class="rounded-2xl p-3 space-y-2" style="background:var(--surface);border:1px solid var(--line)">
+      <input id="searchBox" oninput="onFiltersChanged()" placeholder="ابحث بالبند أو الملاحظة…" class="w-full rounded-xl px-3 py-2 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      <div class="grid grid-cols-3 gap-2">
+        <select id="filterType" onchange="onFiltersChanged()" class="rounded-xl px-2 py-2 text-[12px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+          <option value="">كل الأنواع</option>
+          <option value="expense">مصروف</option>
+          <option value="revenue">دخل</option>
+        </select>
+        <select id="filterWallet" onchange="onFiltersChanged()" class="rounded-xl px-2 py-2 text-[12px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+          <option value="">كل المحافظ</option>
+        </select>
+        <button onclick="exportToCSV()" class="rounded-xl px-2 py-2 text-[12px] font-semibold" style="background:var(--brand);color:#fff">تصدير CSV</button>
+      </div>
+    </div>
+    <p class="text-[11px] px-1" style="color:var(--muted)">اضغط على أي حركة لتعديلها أو حذفها.</p>
+    <p id="entryCount" class="text-[11px] px-1" style="color:var(--muted)">0 حركة</p>
+    <div id="entriesList" class="space-y-2"></div>
+    <button id="loadMoreBtn" onclick="loadMore()" class="hidden w-full rounded-xl py-2.5 text-[12px] font-semibold" style="background:var(--chip);border:1px solid var(--line)">عرض المزيد من الحركات</button>
+  </section>
+
+  <section id="tab-debts" class="tabpane space-y-3">
+    <div class="grid grid-cols-2 gap-3">
+      <div class="rounded-2xl p-4" style="background:var(--leaf-bg);border:1px solid var(--line)">
+        <p class="text-[11px] font-semibold" style="color:var(--muted)">ديون لي (يطالب بها)</p>
+        <h3 id="totalDebtsForMe" class="text-[19px] font-bold mt-1" style="color:var(--leaf)">0 ل.س</h3>
+        <p id="totalDebtsForMeUSD" class="text-[11px]" style="color:var(--muted)">$0.00</p>
+      </div>
+      <div class="rounded-2xl p-4" style="background:var(--soil-bg);border:1px solid var(--line)">
+        <p class="text-[11px] font-semibold" style="color:var(--muted)">ديون علي (التزامات)</p>
+        <h3 id="totalDebtsOnMe" class="text-[19px] font-bold mt-1" style="color:var(--soil)">0 ل.س</h3>
+        <p id="totalDebtsOnMeUSD" class="text-[11px]" style="color:var(--muted)">$0.00</p>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button data-df="all" onclick="setDebtFilter('all')" class="df-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--brand);color:#fff">الكل</button>
+      <button data-df="for_me" onclick="setDebtFilter('for_me')" class="df-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">ديون لي</button>
+      <button data-df="on_me" onclick="setDebtFilter('on_me')" class="df-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">ديون علي</button>
+      <button data-df="settled" onclick="setDebtFilter('settled')" class="df-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">المسددة</button>
+    </div>
+    <p id="debtSyncStatus" class="text-[11px] text-center" style="color:var(--muted)"></p>
+    <div id="debtsList" class="space-y-2"></div>
+  </section>
+
+  <section id="tab-wallets" class="tabpane space-y-3">
+    <p class="text-[11px] px-1" style="color:var(--muted)">أضف محافظك أو حساباتك (نقدي، بطاقة بنكية، توفير...) لمتابعة رصيد كل واحدة منها على حدة.</p>
+    <div class="flex gap-2">
+      <input id="newWalletName" placeholder="اسم المحفظة، مثال: نقدي" class="flex-grow rounded-xl px-3 py-2 text-[13px] outline-none" style="background:var(--surface);border:1px solid var(--line)">
+      <button onclick="addWallet()" class="px-4 rounded-xl text-[13px] font-semibold" style="background:var(--brand);color:#fff">إضافة</button>
+    </div>
+    <div id="walletsList" class="space-y-2"></div>
+  </section>
+
+  <section id="tab-settings" class="tabpane space-y-3">
+    <div class="rounded-2xl p-4 space-y-2" style="background:var(--surface);border:1px solid var(--line)">
+      <label class="text-[12px] font-semibold" style="color:var(--muted)">رابط Google Apps Script (Web App URL)</label>
+      <p class="text-[10px]" style="color:var(--muted)" id="urlFixedNote"></p>
+      <input type="text" id="webAppUrlInput" class="w-full rounded-xl px-3 py-2 text-[11px] font-mono outline-none" style="background:var(--chip);border:1px solid var(--line)" placeholder="https://script.google.com/macros/s/.../exec">
+      <div class="flex gap-2 pt-1">
+        <button onclick="saveWebAppUrl()" class="flex-grow rounded-xl py-2 text-[12px] font-semibold" style="background:var(--brand);color:#fff">حفظ وفحص الاتصال</button>
+        <button onclick="loadDataFromSheet()" class="px-4 rounded-xl text-[12px] font-semibold" style="background:var(--chip);border:1px solid var(--line)">تحديث</button>
+      </div>
+    </div>
+    <div class="rounded-2xl p-4 space-y-2" style="background:var(--surface);border:1px solid var(--line)">
+      <label class="text-[12px] font-semibold" style="color:var(--muted)">رمز الدخول إلى التطبيق</label>
+      <p class="text-[10px]" style="color:var(--muted)" id="pinFixedNote"></p>
+      <div class="flex gap-2">
+        <input type="password" maxlength="12" id="settingsNewPin" placeholder="رمز جديد" class="w-full rounded-xl px-3 py-2 text-[13px] text-center tracking-widest outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        <button onclick="changePin()" class="px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap" style="background:var(--brand);color:#fff">حفظ الرمز</button>
+      </div>
+    </div>
+    <div class="rounded-2xl p-4" style="background:var(--surface);border:1px solid var(--line)">
+      <button onclick="toggleDebugPanel()" class="w-full flex items-center justify-between text-[12px] font-semibold">
+        <span>سجل الاتصال والمزامنة</span>
+        <span id="debugToggleBtnText">إظهار</span>
+      </button>
+      <div id="debugPanel" class="hidden mt-3 rounded-xl p-3 font-mono text-[10px] space-y-1 h-32 overflow-y-auto" style="background:#11140D;color:#8FD37A">
+        <div>[النظام] جاهز.</div>
+      </div>
+    </div>
+    <p class="text-[11px] px-1" style="color:var(--muted)">تُحفظ الحركات محلياً على هذا الجهاز أيضاً كنسخة احتياطية، وتتم مزامنتها مع الجدول عند توفر الاتصال بالإنترنت.</p>
+    <p class="text-[11px] px-1" style="color:var(--muted)">المهام والديون تُحفظ في Google Sheets (أوراق Tasks و Debts) ويتم تحميلها تلقائياً.</p>
+  </section>
+
+  <section id="tab-tasks" class="tabpane space-y-3">
+    <div class="rounded-3xl p-5" style="background:var(--surface);border:1px solid var(--line)">
+      <div class="flex items-center justify-between">
+        <button onclick="shiftTaskDay(-1)" aria-label="اليوم السابق" class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--chip)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></button>
+        <div class="text-center">
+          <p id="taskDayLabel" class="disp text-[28px] font-bold leading-none">اليوم</p>
+          <p id="taskDayDate" class="text-[11px] mt-1" style="color:var(--muted)"></p>
+        </div>
+        <button onclick="shiftTaskDay(1)" aria-label="اليوم التالي" class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:var(--chip)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 6l-6 6 6 6"/></svg></button>
+      </div>
+      <button id="taskTodayBtn" onclick="goTaskToday()" class="hidden mx-auto mt-2 block text-[11px] font-semibold rounded-lg px-3 py-1" style="background:var(--chip)">العودة إلى اليوم</button>
+      <div class="mt-4">
+        <div class="flex items-center justify-between text-[11px] mb-1.5" style="color:var(--muted)"><span id="taskProgressText">لا توجد مهام</span><span id="taskPct" class="font-bold">0%</span></div>
+        <div class="h-2 rounded-full overflow-hidden" style="background:var(--chip)"><div id="taskBar" class="h-full rounded-full" style="width:0%;background:var(--brand2);transition:width .3s"></div></div>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button data-tf="all" onclick="setTaskFilter('all')" class="tf-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--brand);color:#fff">الكل</button>
+      <button data-tf="pending" onclick="setTaskFilter('pending')" class="tf-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">المتبقية</button>
+      <button data-tf="done" onclick="setTaskFilter('done')" class="tf-btn rounded-lg px-3 py-1.5 text-[11px] font-semibold" style="background:var(--chip);color:var(--ink)">المنجزة</button>
+    </div>
+    <p id="taskSyncStatus" class="text-[11px] text-center" style="color:var(--muted)"></p>
+    <div id="tasksList" class="space-y-2"></div>
+    <button onclick="clearDoneTasks()" class="w-full text-[11px] py-2" style="color:var(--muted)">حذف المهام المنجزة غير المتكررة نهائياً</button>
+  </section>
+</main>
+
+<!-- شيت إضافة/تعديل حركة مالية -->
+<div id="addSheet" class="fixed inset-0 z-40 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeAddSheet()"></div>
+  <div class="sheet absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 translate-y-full max-h-[88vh] overflow-y-auto" id="sheetInner" style="background:var(--surface);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px)">
+    <div class="w-10 h-1.5 rounded-full mx-auto mb-4" style="background:var(--line)"></div>
+    <h2 id="sheetTitle" class="font-bold text-[15px] mb-4">إضافة حركة جديدة</h2>
+    <form id="entryForm" onsubmit="addEntry(event)" class="space-y-3">
+      <input type="hidden" id="entryId" value="">
+      <input type="hidden" id="entryIndex" value="">
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" id="typeExpBtn" onclick="setType('expense')" class="rounded-xl py-2.5 text-[13px] font-bold" style="background:var(--soil);color:#fff">مصروف</button>
+        <button type="button" id="typeRevBtn" onclick="setType('revenue')" class="rounded-xl py-2.5 text-[13px] font-bold" style="background:var(--chip);color:var(--ink)">دخل</button>
+      </div>
+      <input type="hidden" id="entryType" value="expense">
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">التصنيف</label>
+        <select id="entryCategory" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"></select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">المبلغ (ل.س)</label>
+          <input type="number" step="1" id="entryAmount" required placeholder="0" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">التاريخ</label>
+          <input type="date" id="entryDate" required class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">المحفظة (اختياري)</label>
+        <select id="entryWallet" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"><option value="">بدون تحديد</option></select>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">سعر صرف الدولار وقت هذه الحركة (ل.س)</label>
+        <input type="number" step="1" id="entryRate" placeholder="15000" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">ملاحظة (اختياري)</label>
+        <input type="text" id="entryNote" placeholder="أي تفاصيل إضافية تريد تسجيلها" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      </div>
+      <button type="submit" id="submitBtn" class="w-full rounded-xl py-3 text-[13px] font-bold mt-1" style="background:var(--brand);color:#fff">حفظ وتصدير للسحابة</button>
+      <button type="button" id="deleteBtn" onclick="deleteEntry()" class="hidden w-full rounded-xl py-2.5 text-[12px] font-bold" style="background:var(--soil-bg);color:var(--soil)">حذف الحركة نهائياً</button>
+    </form>
+  </div>
+</div>
+
+<!-- شيت إضافة/تعديل مهمة -->
+<div id="taskSheet" class="fixed inset-0 z-40 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeTaskSheet()"></div>
+  <div class="sheet absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 translate-y-full max-h-[88vh] overflow-y-auto" id="taskSheetInner" style="background:var(--surface);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px)">
+    <div class="w-10 h-1.5 rounded-full mx-auto mb-4" style="background:var(--line)"></div>
+    <h2 id="taskSheetTitle" class="font-bold text-[15px] mb-4">مهمة جديدة</h2>
+    <form id="taskForm" onsubmit="saveTask(event)" class="space-y-3">
+      <input type="hidden" id="taskId" value="">
+      <div><label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">المهمة</label><input type="text" id="taskTitle" maxlength="120" required placeholder="ماذا تريد أن تنجز؟" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"></div>
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">الأولوية</label>
+        <div class="grid grid-cols-3 gap-2"><button type="button" data-p="1" onclick="setTaskPrio(1)" class="tp-btn rounded-xl py-2.5 text-[12px] font-bold">عالية</button><button type="button" data-p="2" onclick="setTaskPrio(2)" class="tp-btn rounded-xl py-2.5 text-[12px] font-bold">متوسطة</button><button type="button" data-p="3" onclick="setTaskPrio(3)" class="tp-btn rounded-xl py-2.5 text-[12px] font-bold">منخفضة</button></div>
+        <input type="hidden" id="taskPriority" value="2">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">التاريخ</label><input type="date" id="taskDate" required class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"></div>
+        <div><label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">التكرار</label>
+          <select id="taskRepeat" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"><option value="none">مرة واحدة</option><option value="daily">يومياً</option></select>
+        </div>
+      </div>
+      <div><label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">ملاحظة (اختياري)</label><input type="text" id="taskNote" maxlength="200" placeholder="تفاصيل إضافية" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)"></div>
+      <button type="submit" class="w-full rounded-xl py-3 text-[13px] font-bold mt-1" style="background:var(--brand);color:#fff">حفظ المهمة</button>
+      <button type="button" id="taskDeleteBtn" onclick="deleteTask()" class="hidden w-full rounded-xl py-2.5 text-[12px] font-bold" style="background:var(--soil-bg);color:var(--soil)">حذف المهمة</button>
+    </form>
+  </div>
+</div>
+
+<!-- شيت إضافة/تعديل دين -->
+<div id="debtSheet" class="fixed inset-0 z-40 hidden">
+  <div class="absolute inset-0 bg-black/40" onclick="closeDebtSheet()"></div>
+  <div class="sheet absolute bottom-0 left-0 right-0 rounded-t-3xl p-5 translate-y-full max-h-[88vh] overflow-y-auto" id="debtSheetInner" style="background:var(--surface);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px)">
+    <div class="w-10 h-1.5 rounded-full mx-auto mb-4" style="background:var(--line)"></div>
+    <h2 id="debtSheetTitle" class="font-bold text-[15px] mb-4">تسجيل دين جديد</h2>
+    <form id="debtForm" onsubmit="saveDebt(event)" class="space-y-3">
+      <input type="hidden" id="debtId" value="">
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" id="debtTypeForBtn" onclick="setDebtType('for_me')" class="rounded-xl py-2.5 text-[13px] font-bold" style="background:var(--leaf);color:#fff">دين لي (يطالب)</button>
+        <button type="button" id="debtTypeOnBtn" onclick="setDebtType('on_me')" class="rounded-xl py-2.5 text-[13px] font-bold" style="background:var(--chip);color:var(--ink)">دين علي (التزام)</button>
+      </div>
+      <input type="hidden" id="debtType" value="for_me">
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">اسم الشخص / الجهة</label>
+        <input type="text" id="debtPerson" required placeholder="مثال: أحمد، أبو علي..." class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">المبلغ الكلي (ل.س)</label>
+          <input type="number" step="1" id="debtAmount" required placeholder="0" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">المسدد منه (ل.س)</label>
+          <input type="number" step="1" id="debtPaid" placeholder="0" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">التاريخ</label>
+          <input type="date" id="debtDate" required class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+        <div>
+          <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">تاريخ الاستحقاق (اختياري)</label>
+          <input type="date" id="debtDueDate" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+        </div>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold mb-1" style="color:var(--muted)">ملاحظات</label>
+        <input type="text" id="debtNote" placeholder="سبب الدين أو تفاصيل أخرى" class="w-full rounded-xl px-3 py-2.5 text-[13px] outline-none" style="background:var(--chip);border:1px solid var(--line)">
+      </div>
+      <button type="submit" class="w-full rounded-xl py-3 text-[13px] font-bold mt-1" style="background:var(--brand);color:#fff">حفظ الدين</button>
+      <button type="button" id="debtDeleteBtn" onclick="deleteDebt()" class="hidden w-full rounded-xl py-2.5 text-[12px] font-bold" style="background:var(--soil-bg);color:var(--soil)">حذف الدين</button>
+    </form>
+  </div>
+</div>
+
+<!-- شريط التصفح السفلي -->
+<nav class="fixed bottom-0 left-0 right-0 z-30" style="background:var(--surface);border-top:1px solid var(--line)">
+  <div class="max-w-lg mx-auto grid grid-cols-6 items-center px-1 py-1.5 relative text-center">
+    <button class="navbtn active flex flex-col items-center gap-0.5 py-1.5" style="color:var(--muted)" data-tab="dash" onclick="showTab('dash')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9h14v-9"/></svg>
+      <span class="text-[9px] font-semibold">الرئيسية</span>
+    </button>
+    <button class="navbtn flex flex-col items-center gap-0.5 py-1.5" style="color:var(--muted)" data-tab="list" onclick="showTab('list')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span class="text-[9px] font-semibold">الحركات</span>
+    </button>
+    <button class="navbtn flex flex-col items-center gap-0.5 py-1.5" style="color:var(--muted)" data-tab="debts" onclick="showTab('debts')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+      <span class="text-[9px] font-semibold">الديون</span>
+    </button>
+    <div class="flex items-center justify-center">
+      <button onclick="fabAction()" aria-label="إضافة" class="w-11 h-11 rounded-2xl -mt-5 flex items-center justify-center shadow-lg" style="background:var(--brand)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <button class="navbtn flex flex-col items-center gap-0.5 py-1.5" style="color:var(--muted)" data-tab="tasks" onclick="showTab('tasks')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.3 1.3L7 5M3.5 12l1.3 1.3L7 11M3.5 18l1.3 1.3L7 17"/></svg>
+      <span class="text-[9px] font-semibold">المهام</span>
+    </button>
+    <button class="navbtn flex flex-col items-center gap-0.5 py-1.5" style="color:var(--muted)" data-tab="wallets" onclick="showTab('wallets')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.4"/></svg>
+      <span class="text-[9px] font-semibold">المحافظ</span>
+    </button>
+  </div>
+</nav>
+</div>
+
+<script>
+const WEB_APP_URL_FIXED = "https://script.google.com/macros/s/AKfycbzgyo6niHCX5RFeLDMQymjmPnimF8ey7CgqIVbwUJjGqNAgJTcPT2vIgRyWnvSDhurChQ/exec";
+
+let AUTH_TOKEN = localStorage.getItem('pf_token') || '';
+let WEB_APP_URL = WEB_APP_URL_FIXED || localStorage.getItem('pf_webapp_url') || "";
+let entries = [];
+try{ entries = JSON.parse(localStorage.getItem('pf_entries_sync')) || []; }catch(e){ entries = []; }
+let wallets = JSON.parse(localStorage.getItem('pf_wallets') || '["نقدي","بطاقة بنكية"]');
+let barChartInstance = null, pieChartInstance = null;
+let listShown = 30;
+const LIST_PAGE = 30;
+const FETCH_LIMIT = 1500;
+let periodMode = 'all';
+let selectedMonth = '';
+let selectedYear = '';
+const expenseCats = ['بقالة ومواد غذائية','مطاعم وكافيهات','مواصلات ووقود السيارة','فواتير ومرافق (كهرباء وماء وإنترنت)','سكن وإيجار','صحة وعلاج','تعليم','تسوق وملابس','ترفيه وخروجات','أقساط والتزامات','مصاريف أخرى'];
+const revenueCats = ['راتب','عمل حر / مشروع خاص','هدايا ومساعدات','عوائد استثمار','دخل آخر'];
+
+function inPeriod(e){
+  if(periodMode==='all') return true;
+  const d = e.date || ''; const ym = d.slice(0,7); const y = d.slice(0,4);
+  const now = new Date(); const curY = String(now.getFullYear()); const curM = curY+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(periodMode==='thisMonth') return ym===curM;
+  if(periodMode==='thisYear') return y===curY;
+  if(periodMode==='pickMonth') return selectedMonth && ym===selectedMonth;
+  if(periodMode==='pickYear') return selectedYear && y===selectedYear;
+  return true;
+}
+function periodEntries(){
+  const list = entries.map((it,idx)=>Object.assign({},it,{_idx:idx}));
+  return periodMode==='all' ? list : list.filter(inPeriod);
+}
+function periodLabel(){
+  if(periodMode==='all') return 'كل الفترات';
+  if(periodMode==='thisMonth') return 'هذا الشهر';
+  if(periodMode==='thisYear') return 'هذه السنة';
+  if(periodMode==='pickMonth') return selectedMonth || 'اختر شهراً';
+  if(periodMode==='pickYear') return selectedYear || 'اختر سنة';
+}
+function setPeriod(mode){
+  periodMode = mode;
+  if(mode==='pickMonth') selectedMonth = document.getElementById('pickMonthInput').value;
+  if(mode==='pickYear') selectedYear = document.getElementById('pickYearSelect').value;
+  document.querySelectorAll('.period-btn[data-period]').forEach(b=>{
+    const active = b.dataset.period===mode;
+    b.style.background = active ? 'var(--brand)' : 'var(--chip)';
+    b.style.color = active ? '#fff' : 'var(--ink)';
+  });
+  listShown = LIST_PAGE;
+  renderAll();
+}
+function refreshYearOptions(){
+  const years = Array.from(new Set(entries.map(e=>(e.date||'').slice(0,4)).filter(Boolean))).sort().reverse();
+  const sel = document.getElementById('pickYearSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">اختر سنة</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(cur) sel.value = cur;
+}
+
+function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+function usd(n,rate){ return (n/rate).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function usdVal(n){ return n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function logMessage(msg){ const b=document.getElementById('debugPanel'); if(!b) return; b.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>`; b.scrollTop=b.scrollHeight; }
+
+function showLock(){
+  document.getElementById('lockScreen').classList.remove('hidden');
+  document.getElementById('lockEnterView').classList.remove('hidden');
+}
+function authFail(msg){
+  AUTH_TOKEN = ''; localStorage.removeItem('pf_token');
+  showLock();
+  const er = document.getElementById('lockError');
+  er.innerText = msg || 'انتهت الجلسة، أدخل الرمز من جديد.'; er.classList.remove('hidden');
+}
+function unlockApp(){
+  document.getElementById('lockScreen').classList.add('hidden');
+  document.getElementById('enterPin').value = '';
+  document.getElementById('lockError').classList.add('hidden');
+  fillWalletSelects(); renderAll(); loadDataFromSheet(); loadTasksFromSheet(); loadDebtsFromSheet();
+}
+function initLock(){
+  showLock();
+  if(!AUTH_TOKEN) return;
+  taskApi({action:'ping'}, function(res){
+    if(res && res.result==='success' && res.op==='ping') unlockApp();
+    else if(!res) document.getElementById('lockScreen').classList.add('hidden');
+    else if(res.code!=='auth') authFail('الباك ايند غير محدّث: انشر كود Apps Script الجديد (New version).');
+  });
+}
+let loginBusy = false;
+function checkPin(){
+  if(loginBusy) return;
+  const val = document.getElementById('enterPin').value.trim(); if(!val) return;
+  const btn = document.getElementById('loginBtn');
+  loginBusy = true; btn.disabled = true; btn.innerText = 'جارٍ التحقق…';
+  taskApi({action:'login', pin:val}, function(res){
+    loginBusy = false; btn.disabled = false; btn.innerText = 'دخول';
+    if(res && res.result==='success' && res.token){ AUTH_TOKEN = res.token; localStorage.setItem('pf_token', AUTH_TOKEN); unlockApp(); return; }
+    let msg = 'الرمز غير صحيح، حاول مرة أخرى.';
+    if(!res) msg = 'تعذّر الاتصال بالسحابة، تحقق من الإنترنت.';
+    else if(res.code==='locked') msg = 'محاولات خاطئة كثيرة، حاول بعد 15 دقيقة.';
+    else if(res.code==='no_pin') msg = 'لم يتم ضبط الرمز في Apps Script بعد (Script Properties ← PIN).';
+    else if(res.result==='success') msg = 'الباك ايند غير محدّث: انشر كود Apps Script الجديد (New version).';
+    const er = document.getElementById('lockError'); er.innerText = msg; er.classList.remove('hidden');
+    const box = document.getElementById('lockEnterView'); box.classList.add('shake'); setTimeout(()=>box.classList.remove('shake'),300);
+  });
+}
+function forgotPin(){
+  alertCustom('الرمز محفوظ في إعدادات Apps Script: افتح المشروع ← Project Settings ← Script Properties ← الخاصية PIN، وغيّر قيمتها.');
+}
+function lockNow(){
+  AUTH_TOKEN = ''; localStorage.removeItem('pf_token');
+  document.getElementById('lockError').classList.add('hidden');
+  showLock();
+}
+function changePin(){
+  const v = document.getElementById('settingsNewPin').value.trim();
+  if(v.length<4){ alertCustom('الرمز يجب أن يتكون من 4 خانات على الأقل'); return; }
+  taskApi({action:'change_pin', newpin:v}, function(res){
+    if(res && res.result==='success' && res.token){
+      AUTH_TOKEN = res.token; localStorage.setItem('pf_token', AUTH_TOKEN);
+      document.getElementById('settingsNewPin').value = '';
+      alertCustom('تم تغيير الرمز. الأجهزة الأخرى ستطلب الرمز الجديد.');
+    } else if(!res) alertCustom('تعذّر الاتصال بالسحابة');
+    else if(res.code!=='auth') alertCustom(res.message || 'تعذّر تغيير الرمز');
+  });
+}
+
+function applyTheme(t){ document.documentElement.setAttribute('data-theme', t); localStorage.setItem('pf_theme', t); }
+function toggleTheme(){ const cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); applyTheme(cur==='dark'?'light':'dark'); }
+(function initTheme(){ const saved = localStorage.getItem('pf_theme'); if(saved) applyTheme(saved); })();
+
+function showTab(name){
+  currentTab = name;
+  document.querySelectorAll('.tabpane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
+  if(name==='wallets') renderWallets();
+  if(name==='tasks') renderTasks();
+  if(name==='debts') renderDebts();
+}
+
+function openAddSheet(){ document.getElementById('addSheet').classList.remove('hidden'); requestAnimationFrame(()=>document.getElementById('sheetInner').classList.remove('translate-y-full')); }
+function closeAddSheet(){ document.getElementById('sheetInner').classList.add('translate-y-full'); setTimeout(()=>document.getElementById('addSheet').classList.add('hidden'),280); }
+function openNewEntrySheet(){
+  document.getElementById('entryForm').reset();
+  document.getElementById('entryId').value=''; document.getElementById('entryIndex').value='';
+  document.getElementById('entryDate').value = todayStr();
+  document.getElementById('entryRate').value = document.getElementById('exchangeRateInput').value || '15000';
+  setType('expense');
+  document.getElementById('sheetTitle').innerText = 'إضافة حركة جديدة';
+  document.getElementById('submitBtn').innerText = 'حفظ وتصدير للسحابة';
+  document.getElementById('deleteBtn').classList.add('hidden');
+  openAddSheet();
+}
+function openEditSheet(idx){
+  const it = entries[idx]; if(!it) return;
+  const isRev = it.type==='revenue'||it.type==='دخل';
+  setType(isRev?'revenue':'expense');
+  document.getElementById('entryIndex').value = idx;
+  document.getElementById('entryId').value = it.id || '';
+  document.getElementById('entryCategory').value = it.category;
+  document.getElementById('entryAmount').value = it.amount;
+  document.getElementById('entryDate').value = it.date;
+  document.getElementById('entryNote').value = (it.note && it.note!=='-') ? it.note : '';
+  document.getElementById('entryWallet').value = it.wallet || '';
+  document.getElementById('entryRate').value = it.rate || document.getElementById('exchangeRateInput').value || '15000';
+  document.getElementById('sheetTitle').innerText = 'تعديل الحركة';
+  document.getElementById('submitBtn').innerText = 'حفظ التعديلات';
+  document.getElementById('deleteBtn').classList.remove('hidden');
+  openAddSheet();
+}
+function setType(t){
+  document.getElementById('entryType').value = t;
+  const e=document.getElementById('typeExpBtn'), r=document.getElementById('typeRevBtn');
+  if(t==='expense'){ e.style.background='var(--soil)'; e.style.color='#fff'; r.style.background='var(--chip)'; r.style.color='var(--ink)'; }
+  else { r.style.background='var(--leaf)'; r.style.color='#fff'; e.style.background='var(--chip)'; e.style.color='var(--ink)'; }
+  updateCategories();
+}
+function updateCategories(){
+  const type = document.getElementById('entryType').value;
+  const cats = type==='expense' ? expenseCats : revenueCats;
+  document.getElementById('entryCategory').innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+function fillWalletSelects(){
+  document.getElementById('filterWallet').innerHTML = '<option value="">كل المحافظ</option>' + wallets.map(w=>`<option value="${w}">${w}</option>`).join('');
+  document.getElementById('entryWallet').innerHTML = '<option value="">بدون تحديد</option>' + wallets.map(w=>`<option value="${w}">${w}</option>`).join('');
+}
+
+function addWallet(){
+  const v = document.getElementById('newWalletName').value.trim(); if(!v) return;
+  if(!wallets.includes(v)) wallets.push(v);
+  localStorage.setItem('pf_wallets', JSON.stringify(wallets));
+  document.getElementById('newWalletName').value='';
+  fillWalletSelects(); renderWallets();
+}
+function removeWallet(name){
+  wallets = wallets.filter(w=>w!==name);
+  localStorage.setItem('pf_wallets', JSON.stringify(wallets));
+  fillWalletSelects(); renderWallets();
+}
+function renameWallet(oldName){
+  const newName = prompt('أدخل الاسم الجديد لهذه المحفظة:', oldName); if(!newName) return;
+  const clean = newName.trim(); if(!clean || clean===oldName) return;
+  if(wallets.includes(clean)){ alertCustom('هذا الاسم مستخدم لمحفظة أخرى بالفعل'); return; }
+  const affected = entries.filter(e=>e.wallet===oldName).length;
+  wallets = wallets.map(w=>w===oldName?clean:w);
+  entries.forEach(e=>{ if(e.wallet===oldName) e.wallet=clean; });
+  localStorage.setItem('pf_wallets', JSON.stringify(wallets));
+  localStorage.setItem('pf_entries_sync', JSON.stringify(entries));
+  fillWalletSelects(); renderWallets(); renderAll();
+  if(affected>0) alertCustom('تم تغيير الاسم على هذا الجهاز، لكن '+affected+' حركة سابقة لا تزال مسجّلة بالاسم القديم على السحابة');
+  else alertCustom('تم تغيير اسم المحفظة بنجاح');
+}
+function walletMatches(e,w){ return e.wallet===w; }
+function renderWallets(){
+  const rate = parseFloat(document.getElementById('exchangeRateInput').value)||15000;
+  const box = document.getElementById('walletsList');
+  if(wallets.length===0){ box.innerHTML = `<p class="text-[12px] text-center py-6" style="color:var(--muted)">لا توجد محافظ مضافة بعد</p>`; return; }
+  box.innerHTML = wallets.map(w=>{
+    let rev=0, exp=0, revUSD=0, expUSD=0;
+    periodEntries().forEach(e=>{
+      if(!walletMatches(e,w)) return;
+      const isRev=e.type==='revenue'||e.type==='دخل'; const val=Number(e.amount)||0; const r=Number(e.rate)||rate;
+      if(isRev){ rev+=val; revUSD+=val/r; } else { exp+=val; expUSD+=val/r; }
+    });
+    const net = rev-exp; const netUSD = revUSD-expUSD;
+    return `<div class="rounded-2xl p-4" style="background:var(--surface);border:1px solid var(--line)">
+      <div class="flex items-center justify-between">
+        <p class="font-bold text-[13px]">${w}</p>
+        <div class="flex gap-1.5">
+          <button onclick="renameWallet('${w}')" class="w-8 h-8 flex items-center justify-center rounded-lg" style="background:var(--chip)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--brand2)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button onclick="removeWallet('${w}')" class="w-8 h-8 flex items-center justify-center rounded-lg" style="background:var(--chip)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--soil)" stroke-width="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="text-[11px] mt-1" style="color:var(--muted)">الرصيد: <b style="color:${net>=0?'var(--leaf)':'var(--soil)'}">${fmt(net)} ل.س</b> ($${usdVal(netUSD)})</p>
+    </div>`;
+  }).join('');
+}
+
+function onFiltersChanged(){ listShown = LIST_PAGE; renderAll(); }
+function loadMore(){ listShown += LIST_PAGE; renderAll(); }
+
+function renderAll(){
+  refreshYearOptions();
+  document.getElementById('periodLabel').innerText = periodLabel();
+  const rate = parseFloat(document.getElementById('exchangeRateInput').value)||15000;
+  const pList = periodEntries();
+  let totalRev=0, totalExp=0, totalRevUSD=0, totalExpUSD=0; const catTotals={}; expenseCats.forEach(c=>catTotals[c]=0);
+  pList.forEach(it=>{
+    const isRev = it.type==='revenue'||it.type==='دخل'; const val = Number(it.amount)||0;
+    const r = Number(it.rate)||rate;
+    if(isRev){ totalRev+=val; totalRevUSD+=val/r; } else { totalExp+=val; totalExpUSD+=val/r; catTotals[it.category]=(catTotals[it.category]||0)+val; }
+  });
+  const net = totalRev-totalExp;
+  const netUSD = totalRevUSD-totalExpUSD;
+  document.getElementById('totalRevenue').innerText = fmt(totalRev)+' ل.س';
+  document.getElementById('totalRevenueUSD').innerText = '$'+usdVal(totalRevUSD);
+  document.getElementById('totalExpenses').innerText = fmt(totalExp)+' ل.س';
+  document.getElementById('totalExpensesUSD').innerText = '$'+usdVal(totalExpUSD);
+  document.getElementById('netProfit').innerText = fmt(net)+' ل.س';
+  document.getElementById('netProfitUSD').innerText = '$'+usdVal(netUSD);
+
+  const search = (document.getElementById('searchBox').value||'').trim().toLowerCase();
+  const fType = document.getElementById('filterType').value;
+  const fWallet = document.getElementById('filterWallet').value;
+  let filtered = [...pList].reverse().filter(it=>{
+    const isRev = it.type==='revenue'||it.type==='دخل';
+    if(fType==='expense' && isRev) return false;
+    if(fType==='revenue' && !isRev) return false;
+    if(fWallet && !walletMatches(it,fWallet)) return false;
+    if(search && !((it.category||'').toLowerCase().includes(search) || (it.note||'').toLowerCase().includes(search))) return false;
+    return true;
+  });
+  window._lastFiltered = filtered;
+  document.getElementById('entryCount').innerText = filtered.length + ' حركة من أصل ' + entries.length;
+  const list = document.getElementById('entriesList');
+  const visible = filtered.slice(0, listShown);
+  if(visible.length===0){
+    list.innerHTML = `<p class="text-[12px] text-center py-8" style="color:var(--muted)">لا توجد حركات مطابقة</p>`;
+  } else {
+    list.innerHTML = visible.map(it=>{
+      const isRev = it.type==='revenue'||it.type==='دخل'; const val = Number(it.amount)||0;
+      return `<div onclick="openEditSheet(${it._idx})" class="rounded-2xl p-3.5 flex items-center justify-between cursor-pointer active:opacity-70" style="background:var(--surface);border:1px solid var(--line)">
+        <div class="flex items-center gap-3">
+          <div class="w-2 h-9 rounded-full" style="background:${isRev?'var(--leaf)':'var(--soil)'}"></div>
+          <div>
+            <p class="font-bold text-[13px]">${it.category}</p>
+            <p class="text-[11px]" style="color:var(--muted)">${it.date||''}${it.wallet?' · '+it.wallet:''}${it.note && it.note!=='-' ? ' · '+it.note : ''}</p>
+          </div>
+        </div>
+        <div class="text-left">
+          <p class="font-bold text-[13px]" style="color:${isRev?'var(--leaf)':'var(--soil)'}">${isRev?'+':'-'}${fmt(val)}</p>
+          <p class="text-[10px]" style="color:var(--muted)">$${usdVal(val/(Number(it.rate)||rate))}</p>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('loadMoreBtn').classList.toggle('hidden', filtered.length<=listShown);
+  updateBarChart(totalRev, totalExp);
+  updatePieChart(catTotals);
+  if(document.getElementById('tab-wallets').classList.contains('active')) renderWallets();
+}
+
+function updateBarChart(rev, exp){
+  const ctx = document.getElementById('barChart').getContext('2d');
+  if(barChartInstance){ barChartInstance.data.datasets[0].data=[rev,exp]; barChartInstance.update(); return; }
+  barChartInstance = new Chart(ctx, { type:'bar', data:{ labels:['الدخل','المصروف'], datasets:[{data:[rev,exp], backgroundColor:['#3E8E73','#C0563F'], borderRadius:10}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'rgba(120,120,120,.15)'}}, x:{grid:{display:false}}} } });
+}
+function updatePieChart(catTotals){
+  const ctx = document.getElementById('pieChart').getContext('2d');
+  const labels = Object.keys(catTotals).filter(k=>catTotals[k]>0);
+  const data = labels.map(k=>catTotals[k]);
+  if(pieChartInstance){ pieChartInstance.data.labels=labels; pieChartInstance.data.datasets[0].data=data; pieChartInstance.update(); return; }
+  pieChartInstance = new Chart(ctx, { type:'doughnut', data:{ labels, datasets:[{data, backgroundColor:['#3E8E73','#C0563F','#C9A227','#7A8C68','#8E5B3F','#4E7A8C','#9C6B9E','#5D7EBE','#B4884C']}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10}}}} } });
+}
+
+function toggleDebugPanel(){
+  const p = document.getElementById('debugPanel'), t=document.getElementById('debugToggleBtnText');
+  p.classList.toggle('hidden'); t.innerText = p.classList.contains('hidden') ? 'إظهار' : 'إخفاء';
+}
+function saveRate(){ localStorage.setItem('pf_rate', document.getElementById('exchangeRateInput').value); }
+
+function loadDataFromSheet(){
+  if(!WEB_APP_URL){ document.getElementById('syncStatus').innerText='لم يتم إدخال رابط Google Sheets بعد'; return; }
+  logMessage('جلب البيانات من Google Sheets…');
+  const old = document.getElementById('jsonpScript'); if(old) old.remove();
+  window.handleSheetData = function(res){
+    if(res && res.result==='success' && Array.isArray(res.data)){
+      logMessage('نجح جلب '+res.data.length+' صف.');
+      document.getElementById('syncStatus').innerText = 'متصل بنجاح مع Google Sheets';
+      entries = res.data;
+      localStorage.setItem('pf_entries_sync', JSON.stringify(entries));
+      renderAll();
+    } else if(res && res.code==='auth'){
+      authFail();
+    } else {
+      document.getElementById('syncStatus').innerText = 'الجدول فارغ أو تعذّر الجلب';
+      logMessage('الجدول فارغ أو الاستجابة غير متوفرة.');
+    }
+  };
+  const s = document.createElement('script');
+  s.id='jsonpScript';
+  s.src = `${WEB_APP_URL}?callback=handleSheetData&limit=${FETCH_LIMIT}&token=${encodeURIComponent(AUTH_TOKEN)}&t=${Date.now()}`;
+  s.onerror = function(){ document.getElementById('syncStatus').innerText='تعذّر الاتصال بالسحابة'; logMessage('فشل الجلب (تأكد من الرابط وصلاحية Anyone).'); };
+  document.body.appendChild(s);
+}
+function saveWebAppUrl(){
+  const v = document.getElementById('webAppUrlInput').value.trim();
+  if(!v) return alertCustom('الرجاء إدخال رابط صحيح');
+  WEB_APP_URL = v; localStorage.setItem('pf_webapp_url', WEB_APP_URL);
+  if(WEB_APP_URL_FIXED && v!==WEB_APP_URL_FIXED){ logMessage('تنبيه: هاد الرابط رح يشتغل على هالجهاز فقط لأنو في رابط ثابت داخل الملف.'); }
+  logMessage('تم تحديث الرابط.'); loadDataFromSheet();
+}
+function addEntry(ev){
+  ev.preventDefault();
+  const idxStr = document.getElementById('entryIndex').value;
+  const id = document.getElementById('entryId').value;
+  const isEdit = idxStr !== '';
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.innerText = isEdit ? 'جارٍ حفظ التعديلات…' : 'جارٍ الحفظ والتصدير…';
+  const entry = {
+    date: document.getElementById('entryDate').value,
+    type: document.getElementById('entryType').value,
+    category: document.getElementById('entryCategory').value,
+    amount: document.getElementById('entryAmount').value,
+    note: document.getElementById('entryNote').value || '-',
+    wallet: document.getElementById('entryWallet').value || '',
+    rate: document.getElementById('entryRate').value || document.getElementById('exchangeRateInput').value || '15000'
+  };
+  if(isEdit){ const idx = parseInt(idxStr,10); if(entries[idx]) entries[idx] = Object.assign({}, entries[idx], entry); }
+  else { entries.push(entry); }
+  localStorage.setItem('pf_entries_sync', JSON.stringify(entries));
+  renderAll();
+
+  if(!WEB_APP_URL){ btn.disabled=false; closeAddSheet(); alertCustom('تم الحفظ محلياً فقط. أدخل رابط Google Sheets من الإعدادات لتفعيل المزامنة السحابية'); return; }
+  if(isEdit && !id){ btn.disabled=false; closeAddSheet(); alertCustom('تم حفظ التعديل على هذا الجهاز فقط، فهذه الحركة قديمة ولا تملك بعد معرّفاً سحابياً'); return; }
+
+  logMessage(isEdit ? 'جارٍ تحديث الحركة في السحابة…' : 'حفظ محلي، جارٍ التصدير للسحابة…');
+  const qp = new URLSearchParams(Object.assign({ action: isEdit?'edit':'add' }, entry, { id: id||'', token:AUTH_TOKEN, callback:'handleExportResponse', t:Date.now() }));
+  window.handleExportResponse = function(res){
+    logMessage('استجابة السحابة: '+JSON.stringify(res));
+    if(res && res.result==='success'){ alertCustom(isEdit ? 'تم حفظ التعديلات بنجاح' : 'تم تصدير الحركة إلى Google Sheets بنجاح'); setTimeout(loadDataFromSheet, 1000); }
+    else if(res && res.code==='auth'){ authFail(); alertCustom('انتهت الجلسة، لم تُحفظ الحركة في السحابة. سجّل الدخول وأعد إضافتها.'); }
+    else { alertCustom('تعذّر الحفظ في السحابة، تم الحفظ محلياً فقط'); }
+    btn.disabled=false; closeAddSheet();
+  };
+  const old = document.getElementById('exportScript'); if(old) old.remove();
+  const s = document.createElement('script');
+  s.id='exportScript'; s.src = `${WEB_APP_URL}?${qp.toString()}`;
+  s.onerror = function(){ alertCustom('تعذّر الوصول إلى السحابة الآن، تم الحفظ محلياً فقط'); btn.disabled=false; closeAddSheet(); };
+  document.body.appendChild(s);
+}
+function deleteEntry(){
+  const idxStr = document.getElementById('entryIndex').value;
+  const id = document.getElementById('entryId').value;
+  if(idxStr==='') return;
+  if(!confirm('هل تريد حذف هذه الحركة نهائياً؟')) return;
+  const idx = parseInt(idxStr,10);
+  if(!id){
+    entries.splice(idx,1); localStorage.setItem('pf_entries_sync', JSON.stringify(entries)); renderAll(); closeAddSheet();
+    alertCustom('تم الحذف من هذا الجهاز فقط، لأن هذه الحركة قديمة ولا تملك معرّفاً سحابياً بعد'); return;
+  }
+  const btn = document.getElementById('deleteBtn');
+  btn.disabled = true; btn.innerText = 'جارٍ الحذف…';
+  const qp = new URLSearchParams({ action:'delete', id, token:AUTH_TOKEN, callback:'handleDeleteResponse', t:Date.now() });
+  window.handleDeleteResponse = function(res){
+    logMessage('استجابة الحذف: '+JSON.stringify(res));
+    btn.disabled=false; btn.innerText='حذف الحركة نهائياً';
+    if(res && res.result==='success'){ entries.splice(idx,1); localStorage.setItem('pf_entries_sync', JSON.stringify(entries)); renderAll(); alertCustom('تم حذف الحركة'); closeAddSheet(); setTimeout(loadDataFromSheet, 1000); }
+    else if(res && res.code==='auth'){ authFail(); alertCustom('انتهت الجلسة، لم يتم الحذف. سجّل الدخول وأعد المحاولة.'); }
+    else { alertCustom('تعذّر حذف الحركة'); }
+  };
+  const old = document.getElementById('deleteScript'); if(old) old.remove();
+  const s = document.createElement('script');
+  s.id='deleteScript'; s.src = `${WEB_APP_URL}?${qp.toString()}`;
+  s.onerror = function(){ alertCustom('تعذّر حذف الحركة، تحقق من الاتصال'); btn.disabled=false; btn.innerText='حذف الحركة نهائياً'; };
+  document.body.appendChild(s);
+}
+function exportToCSV(){
+  const data = window._lastFiltered && window._lastFiltered.length ? window._lastFiltered : entries;
+  if(data.length===0) return alertCustom('لا توجد بيانات لتصديرها');
+  const rate = parseFloat(document.getElementById('exchangeRateInput').value)||15000;
+  let csv = "\uFEFFالتاريخ,النوع,التصنيف,المبلغ (ل.س),سعر الصرف وقتها,المبلغ (دولار),المحفظة,ملاحظة\n";
+  data.forEach(it=>{
+    const isRev = it.type==='revenue'||it.type==='دخل'; const val = Number(it.amount)||0; const r = Number(it.rate)||rate;
+    csv += `"${it.date}","${isRev?'دخل':'مصروف'}","${it.category}","${val}","${r}","${(val/r).toFixed(2)}","${it.wallet||''}","${it.note||''}"\n`;
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='يومياتي_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  alertCustom('تم تصدير ملف CSV');
+}
+function alertCustom(msg){
+  const box = document.createElement('div');
+  box.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl shadow-lg z-50 text-[12px] font-semibold max-w-[85vw] text-center';
+  box.style.background = 'var(--brand)'; box.style.color = '#fff';
+  box.innerText = msg;
+  document.body.appendChild(box);
+  setTimeout(()=>box.remove(), 3600);
+}
+
+// ====== المهام اليومية ======
+let currentTab = 'dash';
+let tasks = [];
+try{ tasks = JSON.parse(localStorage.getItem('pf_tasks')) || []; }catch(e){ tasks = []; }
+let taskFilter = 'all';
+let taskDay = todayStr();
+let lastToday = todayStr();
+const PRIO = {1:{label:'عالية',color:'var(--soil)'},2:{label:'متوسطة',color:'var(--amber)'},3:{label:'منخفضة',color:'var(--blue)'}};
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+function todayStr(){ return fmtDate(new Date()); }
+function addDays(str,n){ const d=new Date(str+'T12:00:00'); d.setDate(d.getDate()+n); return fmtDate(d); }
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function saveTasks(){ localStorage.setItem('pf_tasks', JSON.stringify(tasks)); }
+
+// ---- مزامنة المهام مع Google Sheets ----
+let taskOps = [];
+try{ taskOps = JSON.parse(localStorage.getItem('pf_task_ops')) || []; }catch(e){ taskOps = []; }
+let taskFlushing = false;
+function saveOps(){ localStorage.setItem('pf_task_ops', JSON.stringify(taskOps)); }
+function setTaskStatus(msg, bad){ const el=document.getElementById('taskSyncStatus'); if(el){ el.innerText=msg; el.style.color = bad ? 'var(--soil)' : 'var(--muted)'; } }
+function taskApi(params, cb){
+  if(!WEB_APP_URL){ cb && cb(null); return; }
+  const name = '__tcb' + Date.now() + Math.floor(Math.random()*1e6);
+  const s = document.createElement('script');
+  let finished = false;
+  const done = function(res){
+    if(finished) return; finished = true;
+    try{ delete window[name]; }catch(e){ window[name] = undefined; }
+    s.remove();
+    if(res && res.code==='auth' && params.action!=='login') authFail();
+    cb && cb(res);
+  };
+  window[name] = done;
+  s.onerror = function(){ done(null); };
+  setTimeout(function(){ done(null); }, 20000);
+  s.src = WEB_APP_URL + '?' + new URLSearchParams(Object.assign({callback:name, t:Date.now(), token:AUTH_TOKEN}, params)).toString();
+  document.body.appendChild(s);
+}
+function queueTaskOp(op){
+  taskOps = taskOps.filter(o=>!(o.id===op.id));
+  taskOps.push(op); saveOps(); flushTaskOps();
+}
+function flushTaskOps(cb){
+  if(taskFlushing){ if(cb) setTimeout(function(){ flushTaskOps(cb); }, 600); return; }
+  if(!taskOps.length){ cb && cb(true); return; }
+  taskFlushing = true;
+  const op = taskOps[0];
+  let params;
+  if(op.t==='s'){
+    const t = tasks.find(x=>x.id===op.id);
+    if(!t){ taskOps.shift(); saveOps(); taskFlushing=false; flushTaskOps(cb); return; }
+    params = { action:'task_save', id:t.id, json:JSON.stringify(t) };
+  } else { params = { action:'task_delete', id:op.id }; }
+  taskApi(params, function(res){
+    taskFlushing = false;
+    const expected = op.t==='s' ? 'task_save' : 'task_delete';
+    if(res && res.result==='success' && res.op===expected){ taskOps = taskOps.filter(o=>o!==op); saveOps(); setTaskStatus(taskOps.length ? 'جاري المزامنة…' : 'تم الحفظ في Google Sheets ✓'); flushTaskOps(cb); }
+    else if(res && res.result==='success'){ setTaskStatus('الباك ايند غير محدّث: انشر كود Apps Script الجديد (New version) ثم أعد فتح الموقع.', true); cb && cb(false); }
+    else if(res && res.result==='error'){ setTaskStatus('خطأ من الجدول: '+(res.message||''), true); cb && cb(false); }
+    else { setTaskStatus('تعذّر الاتصال بالسحابة، سيُعاد رفع المهام لاحقاً.', true); cb && cb(false); }
+  });
+}
+function loadTasksFromSheet(){
+  if(!WEB_APP_URL) return;
+  flushTaskOps(function(ok){
+    if(!ok){ logMessage('تعذّر رفع تغييرات المهام، ستُعاد المحاولة لاحقاً.'); return; }
+    setTaskStatus('جاري تحميل المهام…');
+    taskApi({action:'tasks_list'}, function(res){
+      if(!(res && res.result==='success' && Array.isArray(res.tasks))){
+        setTaskStatus(res && res.result==='success' ? 'الباك ايند غير محدّث: انشر كود Apps Script الجديد (New version) ثم أعد فتح الموقع.' : 'تعذّر جلب المهام من Google Sheets.', true);
+        logMessage('تعذّر جلب المهام من Google Sheets.'); return;
+      }
+      const remote = res.tasks;
+      const remoteIds = new Set(remote.map(t=>t.id));
+      if(!localStorage.getItem('pf_tasks_migrated')){
+        const extra = tasks.filter(t=>!remoteIds.has(t.id));
+        extra.forEach(t=>{ remote.push(t); taskOps.push({t:'s', id:t.id}); });
+        saveOps(); localStorage.setItem('pf_tasks_migrated','1');
+      }
+      tasks = remote; saveTasks(); renderTasks(); flushTaskOps(); setTaskStatus('المهام متزامنة مع Google Sheets ✓');
+      logMessage('تم تحميل '+tasks.length+' مهمة من Google Sheets.');
+    });
+  });
+}
+
+function fabAction(){ 
+  if(currentTab==='tasks') openNewTaskSheet(); 
+  else if(currentTab==='debts') openNewDebtSheet();
+  else openNewEntrySheet(); 
+}
+
+function taskDoneOn(t,day){ return t.repeat==='daily' ? (t.doneDates||[]).includes(day) : !!t.doneAt; }
+function taskVisibleOn(t,day){
+  if(t.repeat==='daily') return day>=t.date;
+  if(t.date===day || t.doneAt===day) return true;
+  return day===todayStr() && !t.doneAt && t.date<day;
+}
+function shiftTaskDay(n){ taskDay = addDays(taskDay,n); renderTasks(); }
+function goTaskToday(){ taskDay = todayStr(); renderTasks(); }
+function setTaskFilter(f){
+  taskFilter = f;
+  document.querySelectorAll('.tf-btn').forEach(b=>{ const a=b.dataset.tf===f; b.style.background=a?'var(--brand)':'var(--chip)'; b.style.color=a?'#fff':'var(--ink)'; });
+  renderTasks();
+}
+function taskGroupHeader(label,color,n){
+  return `<div class="flex items-center gap-2 pt-2 px-1"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span class="text-[11px] font-bold" style="color:var(--muted)">${label}</span><span class="text-[10px]" style="color:var(--muted)">(${n})</span></div>`;
+}
+function taskCard(t,day){
+  const done = taskDoneOn(t,day);
+  const overdue = !done && t.repeat!=='daily' && t.date<day;
+  const pr = PRIO[t.priority] || PRIO[2];
+  const chip = (txt,bg,fg)=>`<span class="text-[10px] font-semibold rounded-md px-1.5 py-0.5" style="background:${bg};color:${fg}">${txt}</span>`;
+  let badges = chip(pr.label,'var(--chip)',pr.color);
+  if(t.repeat==='daily') badges += chip('يومية','var(--chip)','var(--brand2)');
+  if(overdue) badges += chip('متأخرة','var(--soil-bg)','var(--soil)');
+  const note = t.note ? `<p class="text-[11px] mt-1 break-words" style="color:var(--muted)">${esc(t.note)}</p>` : '';
+  const check = done ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : '';
+  return `<div class="rounded-2xl p-3 flex items-start gap-3" style="background:var(--surface);border:1px solid var(--line);border-inline-start:4px solid ${pr.color};${done?'opacity:.62':''}">
+    <button onclick="toggleTask('${t.id}')" aria-label="تبديل حالة الإنجاز" class="shrink-0 mt-0.5 w-7 h-7 rounded-full flex items-center justify-center" style="border:2px solid ${done?'var(--leaf)':'var(--line)'};background:${done?'var(--leaf)':'transparent'}">${check}</button>
+    <div class="flex-grow min-w-0 cursor-pointer" onclick="openEditTask('${t.id}')">
+      <p class="font-bold text-[13px] break-words" style="${done?'text-decoration:line-through;color:var(--muted)':''}">${esc(t.title)}</p>
+      <div class="flex flex-wrap items-center gap-1.5 mt-1">${badges}</div>${note}
+    </div>
+  </div>`;
+}
+
+function renderTasks(){
+  const day = taskDay, today = todayStr();
+  const d = new Date(day+'T12:00:00');
+  const rel = day===today ? 'اليوم' : day===addDays(today,1) ? 'غداً' : day===addDays(today,-1) ? 'أمس' : d.toLocaleDateString('ar-u-nu-latn',{weekday:'long'});
+  document.getElementById('taskDayLabel').innerText = rel;
+  document.getElementById('taskDayDate').innerText = d.toLocaleDateString('ar-u-nu-latn',{day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('taskTodayBtn').classList.toggle('hidden', day===today);
+
+  const all = tasks.filter(t=>taskVisibleOn(t,day));
+  const total = all.length, doneCount = all.filter(t=>taskDoneOn(t,day)).length;
+  const pct = total ? Math.round(doneCount/total*100) : 0;
+  document.getElementById('taskProgressText').innerText = total ? `${doneCount} من ${total} منجزة` : 'لا توجد مهام';
+  document.getElementById('taskPct').innerText = pct+'%';
+  const bar = document.getElementById('taskBar'); bar.style.width = pct+'%'; bar.style.background = pct===100 ? 'var(--leaf)' : 'var(--brand2)';
+
+  const shown = all.filter(t=> taskFilter==='all' ? true : taskFilter==='done' ? taskDoneOn(t,day) : !taskDoneOn(t,day));
+  const byOrder = (a,b)=> (a.priority-b.priority) || ((a.createdAt||0)-(b.createdAt||0));
+  const pending = shown.filter(t=>!taskDoneOn(t,day)).sort(byOrder);
+  const finished = shown.filter(t=>taskDoneOn(t,day)).sort(byOrder);
+
+  const list = document.getElementById('tasksList');
+  if(!shown.length){
+    list.innerHTML = `<p class="text-[12px] text-center py-8" style="color:var(--muted)">لا توجد مهام للعرض</p>`;
+    return;
+  }
+  let html = '';
+  if(pending.length){
+    if(finished.length) html += taskGroupHeader('المتبقية','var(--amber)',pending.length);
+    html += pending.map(t=>taskCard(t,day)).join('');
+  }
+  if(finished.length){
+    if(pending.length) html += taskGroupHeader('المنجزة','var(--leaf)',finished.length);
+    html += finished.map(t=>taskCard(t,day)).join('');
+  }
+  list.innerHTML = html;
+}
+
+function toggleTask(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const day = taskDay;
+  if(t.repeat==='daily'){
+    t.doneDates = t.doneDates || [];
+    if(t.doneDates.includes(day)) t.doneDates = t.doneDates.filter(d=>d!==day);
+    else t.doneDates.push(day);
+  } else {
+    t.doneAt = t.doneAt ? '' : day;
+  }
+  saveTasks(); renderTasks(); queueTaskOp({t:'s', id:t.id});
+}
+
+function openTaskSheet(){ document.getElementById('taskSheet').classList.remove('hidden'); requestAnimationFrame(()=>document.getElementById('taskSheetInner').classList.remove('translate-y-full')); }
+function closeTaskSheet(){ document.getElementById('taskSheetInner').classList.add('translate-y-full'); setTimeout(()=>document.getElementById('taskSheet').classList.add('hidden'),280); }
+
+function setTaskPrio(p){
+  document.getElementById('taskPriority').value = p;
+  document.querySelectorAll('.tp-btn').forEach(b=>{
+    const act = parseInt(b.dataset.p,10) === p;
+    b.style.background = act ? 'var(--brand)' : 'var(--chip)';
+    b.style.color = act ? '#fff' : 'var(--ink)';
+  });
+}
+
+function openNewTaskSheet(){
+  document.getElementById('taskForm').reset();
+  document.getElementById('taskId').value = '';
+  document.getElementById('taskDate').value = taskDay;
+  setTaskPrio(2);
+  document.getElementById('taskSheetTitle').innerText = 'مهمة جديدة';
+  document.getElementById('taskDeleteBtn').classList.add('hidden');
+  openTaskSheet();
+}
+
+function openEditTask(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  document.getElementById('taskId').value = t.id;
+  document.getElementById('taskTitle').value = t.title || '';
+  setTaskPrio(t.priority || 2);
+  document.getElementById('taskDate').value = t.date || todayStr();
+  document.getElementById('taskRepeat').value = t.repeat || 'none';
+  document.getElementById('taskNote').value = t.note || '';
+  document.getElementById('taskSheetTitle').innerText = 'تعديل المهمة';
+  document.getElementById('taskDeleteBtn').classList.remove('hidden');
+  openTaskSheet();
+}
+
+function saveTask(ev){
+  ev.preventDefault();
+  const id = document.getElementById('taskId').value;
+  const title = document.getElementById('taskTitle').value.trim();
+  if(!title) return;
+  const priority = parseInt(document.getElementById('taskPriority').value,10) || 2;
+  const date = document.getElementById('taskDate').value || todayStr();
+  const repeat = document.getElementById('taskRepeat').value || 'none';
+  const note = document.getElementById('taskNote').value.trim();
+
+  let t = tasks.find(x=>x.id===id);
+  if(!t){
+    t = { id: 't_' + Date.now() + '_' + Math.floor(Math.random()*1000), createdAt: Date.now() };
+    tasks.push(t);
+  }
+  t.title = title; t.priority = priority; t.date = date; t.repeat = repeat; t.note = note;
+  saveTasks(); renderTasks(); closeTaskSheet();
+  queueTaskOp({t:'s', id:t.id});
+}
+
+function deleteTask(){
+  const id = document.getElementById('taskId').value;
+  if(!id) return;
+  if(!confirm('هل تريد حذف هذه المهمة؟')) return;
+  tasks = tasks.filter(x=>x.id!==id);
+  saveTasks(); renderTasks(); closeTaskSheet();
+  queueTaskOp({t:'d', id:id});
+}
+
+function clearDoneTasks(){
+  const doneList = tasks.filter(t=> t.repeat!=='daily' && !!t.doneAt);
+  if(!doneList.length) return alertCustom('لا توجد مهام منجزة غير متكررة لحذفها');
+  if(!confirm(`هل تريد حذف ${doneList.length} مهمة منجزة نهائياً؟`)) return;
+  doneList.forEach(t=>{ queueTaskOp({t:'d', id:t.id}); });
+  tasks = tasks.filter(t=> t.repeat==='daily' || !t.doneAt);
+  saveTasks(); renderTasks();
+}
+
+// ====== قسم الديون والالتزامات ======
+let debts = [];
+try{ debts = JSON.parse(localStorage.getItem('pf_debts')) || []; }catch(e){ debts = []; }
+let debtFilter = 'all';
+let debtOps = [];
+try{ debtOps = JSON.parse(localStorage.getItem('pf_debt_ops')) || []; }catch(e){ debtOps = []; }
+let debtFlushing = false;
+
+function saveDebts(){ localStorage.setItem('pf_debts', JSON.stringify(debts)); }
+function saveDebtOps(){ localStorage.setItem('pf_debt_ops', JSON.stringify(debtOps)); }
+function setDebtStatus(msg, bad){ const el=document.getElementById('debtSyncStatus'); if(el){ el.innerText=msg; el.style.color = bad ? 'var(--soil)' : 'var(--muted)'; } }
+
+function queueDebtOp(op){
+  debtOps = debtOps.filter(o=>!(o.id===op.id));
+  debtOps.push(op); saveDebtOps(); flushDebtOps();
+}
+
+function flushDebtOps(cb){
+  if(debtFlushing){ if(cb) setTimeout(function(){ flushDebtOps(cb); }, 600); return; }
+  if(!debtOps.length){ cb && cb(true); return; }
+  debtFlushing = true;
+  const op = debtOps[0];
+  let params;
+  if(op.t==='s'){
+    const d = debts.find(x=>x.id===op.id);
+    if(!d){ debtOps.shift(); saveDebtOps(); debtFlushing=false; flushDebtOps(cb); return; }
+    params = { action:'debt_save', id:d.id, json:JSON.stringify(d) };
+  } else { params = { action:'debt_delete', id:op.id }; }
+  taskApi(params, function(res){
+    debtFlushing = false;
+    const expected = op.t==='s' ? 'debt_save' : 'debt_delete';
+    if(res && res.result==='success' && res.op===expected){ debtOps = debtOps.filter(o=>o!==op); saveDebtOps(); setDebtStatus(debtOps.length ? 'جاري المزامنة…' : 'تم الحفظ في Google Sheets ✓'); flushDebtOps(cb); }
+    else if(res && res.result==='success'){ setDebtStatus('الباك ايند غير محدّث: انشر كود Apps Script الجديد.', true); cb && cb(false); }
+    else { setDebtStatus('تعذّر الاتصال بالسحابة للديون.', true); cb && cb(false); }
+  });
+}
+
+function loadDebtsFromSheet(){
+  if(!WEB_APP_URL) return;
+  flushDebtOps(function(ok){
+    if(!ok) return;
+    setDebtStatus('جاري تحميل الديون…');
+    taskApi({action:'debts_list'}, function(res){
+      if(!(res && res.result==='success' && Array.isArray(res.debts))){
+        setDebtStatus('تعذّر جلب الديون.', true); return;
+      }
+      debts = res.debts; saveDebts(); renderDebts(); flushDebtOps(); setDebtStatus('الديون متزامنة ✓');
+    });
+  });
+}
+
+function setDebtFilter(f){
+  debtFilter = f;
+  document.querySelectorAll('.df-btn').forEach(b=>{
+    const a = b.dataset.df === f;
+    b.style.background = a ? 'var(--brand)' : 'var(--chip)';
+    b.style.color = a ? '#fff' : 'var(--ink)';
+  });
+  renderDebts();
+}
+
+function setDebtType(t){
+  document.getElementById('debtType').value = t;
+  const f = document.getElementById('debtTypeForBtn'), o = document.getElementById('debtTypeOnBtn');
+  if(t==='for_me'){ f.style.background='var(--leaf)'; f.style.color='#fff'; o.style.background='var(--chip)'; o.style.color='var(--ink)'; }
+  else { o.style.background='var(--soil)'; o.style.color='#fff'; f.style.background='var(--chip)'; f.style.color='var(--ink)'; }
+}
+
+function openDebtSheet(){ document.getElementById('debtSheet').classList.remove('hidden'); requestAnimationFrame(()=>document.getElementById('debtSheetInner').classList.remove('translate-y-full')); }
+function closeDebtSheet(){ document.getElementById('debtSheetInner').classList.add('translate-y-full'); setTimeout(()=>document.getElementById('debtSheet').classList.add('hidden'),280); }
+
+function openNewDebtSheet(){
+  document.getElementById('debtForm').reset();
+  document.getElementById('debtId').value = '';
+  document.getElementById('debtDate').value = todayStr();
+  setDebtType('for_me');
+  document.getElementById('debtSheetTitle').innerText = 'تسجيل دين جديد';
+  document.getElementById('debtDeleteBtn').classList.add('hidden');
+  openDebtSheet();
+}
+
+function openEditDebt(id){
+  const d = debts.find(x=>x.id===id); if(!d) return;
+  document.getElementById('debtId').value = d.id;
+  setDebtType(d.type || 'for_me');
+  document.getElementById('debtPerson').value = d.person || '';
+  document.getElementById('debtAmount').value = d.amount || 0;
+  document.getElementById('debtPaid').value = d.paid || 0;
+  document.getElementById('debtDate').value = d.date || todayStr();
+  document.getElementById('debtDueDate').value = d.dueDate || '';
+  document.getElementById('debtNote').value = d.note || '';
+  document.getElementById('debtSheetTitle').innerText = 'تعديل الدين';
+  document.getElementById('debtDeleteBtn').classList.remove('hidden');
+  openDebtSheet();
+}
+
+function saveDebt(ev){
+  ev.preventDefault();
+  const id = document.getElementById('debtId').value;
+  const type = document.getElementById('debtType').value;
+  const person = document.getElementById('debtPerson').value.trim();
+  const amount = parseFloat(document.getElementById('debtAmount').value) || 0;
+  const paid = parseFloat(document.getElementById('debtPaid').value) || 0;
+  const date = document.getElementById('debtDate').value || todayStr();
+  const dueDate = document.getElementById('debtDueDate').value || '';
+  const note = document.getElementById('debtNote').value.trim();
+
+  let d = debts.find(x=>x.id===id);
+  if(!d){
+    d = { id: 'd_' + Date.now() + '_' + Math.floor(Math.random()*1000), createdAt: Date.now() };
+    debts.push(d);
+  }
+  d.type = type; d.person = person; d.amount = amount; d.paid = paid; d.date = date; d.dueDate = dueDate; d.note = note;
+  saveDebts(); renderDebts(); closeDebtSheet();
+  queueDebtOp({t:'s', id:d.id});
+}
+
+function deleteDebt(){
+  const id = document.getElementById('debtId').value;
+  if(!id) return;
+  if(!confirm('هل تريد حذف هذا الدين؟')) return;
+  debts = debts.filter(x=>x.id!==id);
+  saveDebts(); renderDebts(); closeDebtSheet();
+  queueDebtOp({t:'d', id:id});
+}
+
+function renderDebts(){
+  const rate = parseFloat(document.getElementById('exchangeRateInput').value)||15000;
+  let sumForMe = 0, sumOnMe = 0;
+  debts.forEach(d=>{
+    const rem = Math.max(0, (Number(d.amount)||0) - (Number(d.paid)||0));
+    if(d.type==='for_me') sumForMe += rem;
+    else sumOnMe += rem;
+  });
+
+  document.getElementById('totalDebtsForMe').innerText = fmt(sumForMe) + ' ل.س';
+  document.getElementById('totalDebtsForMeUSD').innerText = '$' + usdVal(sumForMe/rate);
+  document.getElementById('totalDebtsOnMe').innerText = fmt(sumOnMe) + ' ل.س';
+  document.getElementById('totalDebtsOnMeUSD').innerText = '$' + usdVal(sumOnMe/rate);
+
+  const shown = debts.filter(d=>{
+    const rem = (Number(d.amount)||0) - (Number(d.paid)||0);
+    if(debtFilter==='settled') return rem <= 0;
+    if(debtFilter==='for_me') return d.type==='for_me' && rem > 0;
+    if(debtFilter==='on_me') return d.type==='on_me' && rem > 0;
+    return true;
+  });
+
+  const list = document.getElementById('debtsList');
+  if(!shown.length){
+    list.innerHTML = `<p class="text-[12px] text-center py-8" style="color:var(--muted)">لا توجد ديون مسجلة</p>`;
+    return;
+  }
+
+  list.innerHTML = shown.map(d=>{
+    const isForMe = d.type === 'for_me';
+    const total = Number(d.amount)||0;
+    const paid = Number(d.paid)||0;
+    const rem = Math.max(0, total - paid);
+    const isSettled = rem <= 0;
+    const color = isSettled ? 'var(--muted)' : (isForMe ? 'var(--leaf)' : 'var(--soil)');
+
+    return `<div onclick="openEditDebt('${d.id}')" class="rounded-2xl p-3.5 flex items-center justify-between cursor-pointer active:opacity-70" style="background:var(--surface);border:1px solid var(--line);${isSettled?'opacity:.6':''}">
+      <div class="flex items-center gap-3">
+        <div class="w-2 h-10 rounded-full" style="background:${color}"></div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <p class="font-bold text-[13px]">${esc(d.person)}</p>
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded" style="background:var(--chip);color:${color}">${isSettled ? 'مسدد بالكامل' : (isForMe ? 'دين لي' : 'دين علي')}</span>
+          </div>
+          <p class="text-[11px]" style="color:var(--muted)">${d.date||''}${d.dueDate ? ' · يستحق: '+d.dueDate : ''}${d.note ? ' · '+esc(d.note) : ''}</p>
+        </div>
+      </div>
+      <div class="text-left">
+        <p class="font-bold text-[13px]" style="color:${color}">${fmt(rem)} ل.س</p>
+        <p class="text-[10px]" style="color:var(--muted)">المتبقي من ${fmt(total)}</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- تهيئة التطبيق عند الفتح ----
+window.addEventListener('DOMContentLoaded', function(){
+  fillWalletSelects();
+  const savedRate = localStorage.getItem('pf_rate');
+  if(savedRate) document.getElementById('exchangeRateInput').value = savedRate;
+  if(WEB_APP_URL) document.getElementById('webAppUrlInput').value = WEB_APP_URL;
+  renderAll();
+  initLock();
+});
+</script>
+</body>
+</html>
